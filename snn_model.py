@@ -1,3 +1,4 @@
+import os
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -291,23 +292,42 @@ if __name__ == "__main__":
     # 设置设备
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
-    # 先训练模型
-    main()
-    
-    # 加载测试数据集
-    transform = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize((0.1307,), (0.3081,))
-    ])
-    test_dataset = datasets.MNIST(root='./data', train=False, download=True, transform=transform)
-    test_loader = DataLoader(test_dataset, batch_size=64, shuffle=False, pin_memory=True, num_workers=4)
-    
-    # 加载训练好的模型
-    model = SNNModel(28*28, 512, 10).to(device)
-    model.load_state_dict(torch.load('snn_model.pth'))
-    
-    # 测试模型
-    test_model(model, test_loader, device)
-    
-    # 可视化预测结果
-    visualize_predictions(model, test_loader, device)
+    while True:
+        print("\n请选择操作模式:")
+        print("1. 训练模型")
+        print("2. 验证模型")
+        print("3. 退出")
+        choice = input("请输入选项(1/2/3): ")
+        
+        if choice == "1":
+            # 训练模式
+            main()
+            print("训练完成！")
+        elif choice == "2":
+            # 验证模式
+            if not os.path.exists('snn_model.pth'):
+                print("错误: 未找到训练好的模型文件'snn_model.pth'，请先训练模型！")
+                continue
+                
+            # 加载测试数据集
+            transform = transforms.Compose([
+                transforms.ToTensor(),
+                transforms.Normalize((0.1307,), (0.3081,))
+            ])
+            test_dataset = datasets.MNIST(root='./data', train=False, download=True, transform=transform)
+            test_loader = DataLoader(test_dataset, batch_size=64, shuffle=False, pin_memory=True, num_workers=4)
+            
+            # 加载训练好的模型
+            model = SNNModel(28*28, 512, 10).to(device)
+            model.load_state_dict(torch.load('snn_model.pth'))
+            
+            # 测试模型
+            test_model(model, test_loader, device)
+            
+            # 可视化预测结果
+            visualize_predictions(model, test_loader, device)
+        elif choice == "3":
+            print("程序退出。")
+            break
+        else:
+            print("无效输入，请重新选择！")

@@ -176,14 +176,17 @@ def main():
     torch.save(model.state_dict(), 'snn_model.pth')
     print("Model saved to snn_model.pth")
 
-def test_model(model, test_loader, device):
+def test_model(model, test_loader, device, num_batches=None):
     model.eval()
     model.to(device)
     correct = 0
     total = 0
     
     with torch.no_grad():
-        for images, labels in test_loader:
+        for batch_idx, (images, labels) in enumerate(test_loader):
+            if num_batches is not None and batch_idx >= num_batches:
+                break
+                
             images = images.view(images.size(0), -1).to(device)
             labels = labels.to(device)
             
@@ -191,9 +194,13 @@ def test_model(model, test_loader, device):
             _, predicted = torch.max(outputs.data, 1)
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
+            
+            # 每100个batch打印一次进度
+            if batch_idx % 100 == 0:
+                print(f'Processed {batch_idx+1} batches, current accuracy: {100 * correct / total:.2f}%')
     
     accuracy = 100 * correct / total
-    print(f'Test Accuracy: {accuracy:.2f}%')
+    print(f'\nFinal Test Accuracy: {accuracy:.2f}% (Tested on {total} samples)')
     return accuracy
 
 def visualize_predictions(model, test_loader, device, num_images=5):
@@ -204,16 +211,53 @@ def visualize_predictions(model, test_loader, device, num_images=5):
     images, labels = next(dataiter)
     
     with torch.no_grad():
-        outputs = model(images.view(images.size(0), -1).to(device))
-        _, predicted = torch.max(outputs, 1)
+        # 获取所有时间步的输出
+        functional.reset_net(model)
+        x = images.view(images.size(0), -1).to(device)
+        outputs = []
+        accumulated_input = torch.zeros_like(x)
+        chunk_size = x.size(1) // model.time_steps
+        
+        for t in range(model.time_steps):
+            start_idx = t * chunk_size
+            end_idx = (t + 1) * chunk_size if t < model.time_steps - 1 else x.size(1)
+            current_chunk = x[:, start_idx:end_idx]
+            
+            accumulated_input = accumulated_input.clone()
+            accumulated_input[:, start_idx:end_idx] = current_chunk
+            
+            x_t = model.fc1(accumulated_input)
+            x_t = model.lif1(x_t)
+            x_t = model.fc2(x_t)
+            x_t = model.lif2(x_t)
+            x_t = model.fc3(x_t)
+            x_t = model.lif3(x_t)
+            
+            outputs.append(x_t)
+        
+        # 获取最终预测
+        _, predicted = torch.max(outputs[-1], 1)
     
     # 显示图像和预测结果
-    plt.figure(figsize=(10, 4))
+    plt.figure(figsize=(15, 4))
+    
+    # 显示原始图像和最终预测
     for i in range(num_images):
-        plt.subplot(1, num_images, i+1)
+        plt.subplot(2, num_images, i+1)
         plt.imshow(images[i].numpy().squeeze(), cmap='gray')
-        plt.title(f'Pred: {predicted[i].item()}\nTrue: {labels[i].item()}')
+        plt.title(f'Final Pred: {predicted[i].item()}\nTrue: {labels[i].item()}')
         plt.axis('off')
+    
+    # 显示部分时间步的中间结果
+    for i in range(num_images):
+        plt.subplot(2, num_images, num_images+i+1)
+        
+        # 可视化某个中间层的激活
+        mid_output = outputs[model.time_steps//2][i].detach().cpu().numpy()
+        plt.bar(range(10), mid_output, color='blue')
+        plt.title(f'Mid-step Output')
+        plt.ylim([-1, 1])
+    
     plt.tight_layout()
     plt.show()
 

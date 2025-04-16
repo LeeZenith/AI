@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Data files
+*.pth
+*.pkl
+*.pickle
+
+# Logs and databases
+*.log
+*.sqlite
+
+# Local development
+.DS_Store
+
+# MNIST dataset
+data/

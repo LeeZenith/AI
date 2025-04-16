@@ -9,11 +9,11 @@ import matplotlib.pyplot as plt
 from spikingjelly.activation_based import neuron, layer, functional
 
 # 全局模型参数
-MODEL_HIDDEN_SIZE = 2048
-TIME_STEPS = 20
+MODEL_HIDDEN_SIZE = 4096
+TIME_STEPS = 30
 BATCH_SIZE = 2048  # 增加batch_size以充分利用GPU内存
-LEARNING_RATE = 0.001
-EPOCHS = 10
+LEARNING_RATE = 0.0005
+EPOCHS = 20
 INPUT_SIZE = 28*28  # MNIST图像大小
 OUTPUT_SIZE = 10
 global device
@@ -157,6 +157,8 @@ def main():
     
     # 数据预处理
     transform = transforms.Compose([
+        transforms.RandomRotation(10),
+        transforms.RandomAffine(0, translate=(0.1, 0.1)),
         transforms.ToTensor(),
         transforms.Normalize((0.1307,), (0.3081,))
     ])
@@ -170,7 +172,7 @@ def main():
     
     # 损失函数和优化器
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-4)
     
     # 训练模型
     train_model(model, train_loader, criterion, optimizer, device, epochs)

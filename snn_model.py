@@ -218,6 +218,10 @@ def visualize_predictions(model, test_loader, device, num_images=5):
         accumulated_input = torch.zeros_like(x)
         chunk_size = x.size(1) // model.time_steps
         
+        # 创建动画
+        plt.figure(figsize=(15, 6))
+        plt.ion()  # 开启交互模式
+        
         for t in range(model.time_steps):
             start_idx = t * chunk_size
             end_idx = (t + 1) * chunk_size if t < model.time_steps - 1 else x.size(1)
@@ -234,32 +238,54 @@ def visualize_predictions(model, test_loader, device, num_images=5):
             x_t = model.lif3(x_t)
             
             outputs.append(x_t)
+            
+            # 动态显示处理过程
+            plt.clf()
+            
+            # 显示当前输入图像块
+            for i in range(num_images):
+                plt.subplot(3, num_images, i+1)
+                
+                # 显示当前输入的部分图像
+                partial_img = torch.zeros_like(images[i])
+                partial_img.view(-1)[:end_idx] = images[i].view(-1)[:end_idx]
+                plt.imshow(partial_img.numpy().squeeze(), cmap='gray')
+                plt.title(f'Input Step {t+1}/{model.time_steps}')
+                plt.axis('off')
+            
+            # 显示中间层激活
+            for i in range(num_images):
+                plt.subplot(3, num_images, num_images+i+1)
+                plt.bar(range(10), outputs[t][i].detach().cpu().numpy(), color='blue')
+                plt.title(f'Step {t+1} Output')
+                plt.ylim([-1, 1])
+            
+            # 显示当前预测
+            _, current_pred = torch.max(outputs[t], 1)
+            for i in range(num_images):
+                plt.subplot(3, num_images, 2*num_images+i+1)
+                plt.text(0.5, 0.5, f'Pred: {current_pred[i].item()}\nTrue: {labels[i].item()}', 
+                         ha='center', va='center', fontsize=12)
+                plt.axis('off')
+            
+            plt.pause(0.5)  # 暂停0.5秒
+        
+        plt.ioff()  # 关闭交互模式
+        plt.show()
         
         # 获取最终预测
         _, predicted = torch.max(outputs[-1], 1)
-    
-    # 显示图像和预测结果
-    plt.figure(figsize=(15, 4))
-    
-    # 显示原始图像和最终预测
-    for i in range(num_images):
-        plt.subplot(2, num_images, i+1)
-        plt.imshow(images[i].numpy().squeeze(), cmap='gray')
-        plt.title(f'Final Pred: {predicted[i].item()}\nTrue: {labels[i].item()}')
-        plt.axis('off')
-    
-    # 显示部分时间步的中间结果
-    for i in range(num_images):
-        plt.subplot(2, num_images, num_images+i+1)
         
-        # 可视化某个中间层的激活
-        mid_output = outputs[model.time_steps//2][i].detach().cpu().numpy()
-        plt.bar(range(10), mid_output, color='blue')
-        plt.title(f'Mid-step Output')
-        plt.ylim([-1, 1])
-    
-    plt.tight_layout()
-    plt.show()
+        # 显示最终结果
+        plt.figure(figsize=(15, 4))
+        for i in range(num_images):
+            plt.subplot(1, num_images, i+1)
+            plt.imshow(images[i].numpy().squeeze(), cmap='gray')
+            plt.title(f'Final Pred: {predicted[i].item()}\nTrue: {labels[i].item()}')
+            plt.axis('off')
+        
+        plt.tight_layout()
+        plt.show()
 
 if __name__ == "__main__":
     # 设置设备

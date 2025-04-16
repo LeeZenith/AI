@@ -16,6 +16,7 @@ LEARNING_RATE = 0.001
 EPOCHS = 10
 INPUT_SIZE = 28*28  # MNIST图像大小
 OUTPUT_SIZE = 10
+global device
 
 class SNNModel(nn.Module):
     def __init__(self, input_size, hidden_size, output_size, time_steps=TIME_STEPS):
@@ -105,14 +106,14 @@ def train_model(model, train_loader, criterion, optimizer, device, epochs=10):
     
     for epoch in range(epochs):
         running_loss = 0.0
-        if torch.cuda.is_available():
+        if str(device) == "cuda":
             start_event.record()
         else:
             start_time = time.time()
         
         for i, (inputs, labels) in enumerate(train_loader):
-            inputs = inputs.view(inputs.size(0), -1).to(device, non_blocking=True)
-            labels = labels.to(device, non_blocking=True)
+            inputs = inputs.view(inputs.size(0), -1).to(device)
+            labels = labels.to(device)
             
             # 清零梯度
             optimizer.zero_grad(set_to_none=True)
@@ -135,7 +136,7 @@ def train_model(model, train_loader, criterion, optimizer, device, epochs=10):
                 print(f'Epoch {epoch+1}, Batch {i+1}, Loss: {running_loss/100:.4f}')
                 running_loss = 0.0
         
-        if torch.cuda.is_available():
+        if str(device) == "cuda":
             end_event.record()
             torch.cuda.synchronize()
             elapsed_time = start_event.elapsed_time(end_event) / 1000.0
@@ -145,20 +146,7 @@ def train_model(model, train_loader, criterion, optimizer, device, epochs=10):
         print(f'Epoch {epoch+1} completed in {elapsed_time:.2f}s, Total time: {total_time:.2f}s')
 
 def main():
-    # 设置设备
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Using device: {device}")
-    if str(device) == "cuda":
-        print(f"CUDA device name: {torch.cuda.get_device_name(0)}")
-        # 检查CUDA是否正常工作
-        print(f"CUDA memory allocated: {torch.cuda.memory_allocated(0)/1024**2:.2f} MB")
-        print(f"CUDA memory cached: {torch.cuda.memory_reserved(0)/1024**2:.2f} MB")
-    else:
-        print("Warning: CUDA not available, using CPU instead")
-        # 检查PyTorch是否安装了GPU版本
-        print(f"PyTorch version: {torch.__version__}")
-        print(f"CUDA available: {torch.cuda.is_available()}")
-        print(f"CUDA version: {torch.version.cuda if torch.cuda.is_available() else 'N/A'}")
+    device = select_device()
     # 超参数
     input_size = INPUT_SIZE
     hidden_size = MODEL_HIDDEN_SIZE
@@ -191,34 +179,50 @@ def main():
     torch.save(model.state_dict(), 'snn_model.pth')
     print("Model saved to snn_model.pth")
 
-def test_model(model, test_loader, device, num_batches=None):
+def test_model(model, test_loader, device=None, num_batches=None):
+    if device is None:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.eval()
     model.to(device)
     correct = 0
     total = 0
+    
+    # 设备监控初始化
+    if str(device) == "cuda":
+        torch.cuda.empty_cache()
+        torch.cuda.synchronize()
+        print(f"CUDA memory allocated: {torch.cuda.memory_allocated(0)/1024**2:.2f} MB")
+        print(f"CUDA memory cached: {torch.cuda.memory_reserved(0)/1024**2:.2f} MB")
+        print(f"CUDA utilization: {torch.cuda.utilization(0)}%")
     
     with torch.no_grad():
         for batch_idx, (images, labels) in enumerate(test_loader):
             if num_batches is not None and batch_idx >= num_batches:
                 break
                 
-            images = images.view(images.size(0), -1).to(device)
-            labels = labels.to(device)
+            # 使用non_blocking传输减少等待时间
+            images = images.view(images.size(0), -1).to(device, non_blocking=True)
+            labels = labels.to(device, non_blocking=True)
             
             outputs = model(images)
             _, predicted = torch.max(outputs.data, 1)
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
             
-            # 每100个batch打印一次进度
+            # 每100个batch打印一次进度和设备状态
             if batch_idx % 100 == 0:
                 print(f'Processed {batch_idx+1} batches, current accuracy: {100 * correct / total:.2f}%')
+                if str(device) == "cuda":
+                    print(f"CUDA memory allocated: {torch.cuda.memory_allocated(0)/1024**2:.2f} MB")
+                    print(f"CUDA utilization: {torch.cuda.utilization(0)}%")
     
     accuracy = 100 * correct / total
     print(f'\nFinal Test Accuracy: {accuracy:.2f}% (Tested on {total} samples)')
     return accuracy
 
-def visualize_predictions(model, test_loader, device, num_images=5):
+def visualize_predictions(model, test_loader, device=None, num_images=5):
+    if device is None:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.eval()
     model.to(device)
     
@@ -302,10 +306,35 @@ def visualize_predictions(model, test_loader, device, num_images=5):
         plt.tight_layout()
         plt.show()
 
-if __name__ == "__main__":
-    # 设置设备
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+def select_device():
+    while True:
+        print("\n请选择运行设备:")
+        print("1. 自动选择(优先使用GPU)")
+        print("2. 强制使用CPU")
+        print("3. 强制使用GPU(如果可用)")
+        device_choice = input("请输入选项(1/2/3): ")
+        
+        if device_choice == "1":
+            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            break
+        elif device_choice == "2":
+            device = torch.device("cpu")
+            break
+        elif device_choice == "3":
+            if torch.cuda.is_available():
+                device = torch.device("cuda")
+                break
+            else:
+                print("错误: GPU不可用，请重新选择！")
+        else:
+            print("无效输入，请重新选择！")
     
+    print(f"\n使用设备: {device}")
+    if str(device) == "cuda":
+        print(f"CUDA设备名称: {torch.cuda.get_device_name(0)}")
+    return device
+
+if __name__ == "__main__":
     while True:
         print("\n请选择操作模式:")
         print("1. 训练模型")
@@ -319,6 +348,7 @@ if __name__ == "__main__":
             print("训练完成！")
         elif choice == "2":
             # 验证模式
+            device = select_device()
             if not os.path.exists('snn_model.pth'):
                 print("错误: 未找到训练好的模型文件'snn_model.pth'，请先训练模型！")
                 continue

@@ -329,7 +329,11 @@ if __name__ == "__main__":
                 transforms.Normalize((0.1307,), (0.3081,))
             ])
             test_dataset = datasets.MNIST(root='./data', train=False, download=True, transform=transform)
-            test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE//16, shuffle=False, pin_memory=True, num_workers=4)
+            # 设置随机种子以保证可重复性
+            torch.manual_seed(42)
+            np.random.seed(42)
+            
+            test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE//16, shuffle=True, pin_memory=True, num_workers=4)
             
             # 加载训练好的模型
             model = SNNModel(28*28, MODEL_HIDDEN_SIZE, 10).to(device)

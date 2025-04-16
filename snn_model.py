@@ -206,21 +206,6 @@ def visualize_predictions(model, test_loader, device, num_images=5):
 if __name__ == "__main__":
     # 设置设备
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Using device: {device}")
-    if str(device) == "cuda":
-        print(f"CUDA device name: {torch.cuda.get_device_name(0)}")
-        # 检查CUDA是否正常工作
-        print(f"CUDA memory allocated: {torch.cuda.memory_allocated(0)/1024**2:.2f} MB")
-        print(f"CUDA memory cached: {torch.cuda.memory_reserved(0)/1024**2:.2f} MB")
-    else:
-        print("Warning: CUDA not available, using CPU instead")
-        # 检查PyTorch是否安装了GPU版本
-        print(f"PyTorch version: {torch.__version__}")
-        print(f"CUDA available: {torch.cuda.is_available()}")
-        print(f"CUDA version: {torch.version.cuda if torch.cuda.is_available() else 'N/A'}")
-    
-    # 执行训练流程
-    main()
     
     # 加载测试数据集
     transform = transforms.Compose([

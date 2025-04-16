@@ -32,11 +32,25 @@ class SNNModel(nn.Module):
         # 确保输入形状正确
         x = x.view(x.size(0), -1)
         
+        # 将图像分成多个块，模拟逐步输入
+        chunk_size = x.size(1) // self.time_steps
+        
         # 时间步循环
         outputs = []
+        accumulated_input = torch.zeros_like(x)
+        
         for t in range(self.time_steps):
+            # 获取当前时间步的图像块
+            start_idx = t * chunk_size
+            end_idx = (t + 1) * chunk_size if t < self.time_steps - 1 else x.size(1)
+            current_chunk = x[:, start_idx:end_idx]
+            
+            # 累积输入信息
+            accumulated_input = accumulated_input.clone()
+            accumulated_input[:, start_idx:end_idx] = current_chunk
+            
             # 前向传播
-            x_t = self.fc1(x)
+            x_t = self.fc1(accumulated_input)
             x_t = self.lif1(x_t)
             
             x_t = self.fc2(x_t)
@@ -206,6 +220,9 @@ def visualize_predictions(model, test_loader, device, num_images=5):
 if __name__ == "__main__":
     # 设置设备
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    
+    # 先训练模型
+    main()
     
     # 加载测试数据集
     transform = transforms.Compose([

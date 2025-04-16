@@ -8,8 +8,17 @@ import numpy as np
 import matplotlib.pyplot as plt
 from spikingjelly.activation_based import neuron, layer, functional
 
+# 全局模型参数
+MODEL_HIDDEN_SIZE = 2048
+TIME_STEPS = 20
+BATCH_SIZE = 1024
+LEARNING_RATE = 0.001
+EPOCHS = 10
+INPUT_SIZE = 28*28  # MNIST图像大小
+OUTPUT_SIZE = 10
+
 class SNNModel(nn.Module):
-    def __init__(self, input_size, hidden_size, output_size, time_steps=10):
+    def __init__(self, input_size, hidden_size, output_size, time_steps=TIME_STEPS):
         super(SNNModel, self).__init__()
         self.time_steps = time_steps
         
@@ -146,12 +155,12 @@ def main():
         print(f"CUDA available: {torch.cuda.is_available()}")
         print(f"CUDA version: {torch.version.cuda if torch.cuda.is_available() else 'N/A'}")
     # 超参数
-    input_size = 28*28  # MNIST图像大小
-    hidden_size = 512
-    output_size = 10
-    batch_size = 256
-    learning_rate = 0.001
-    epochs = 10
+    input_size = INPUT_SIZE
+    hidden_size = MODEL_HIDDEN_SIZE
+    output_size = OUTPUT_SIZE
+    batch_size = BATCH_SIZE
+    learning_rate = LEARNING_RATE
+    epochs = EPOCHS
     
     # 数据预处理
     transform = transforms.Compose([
@@ -315,10 +324,10 @@ if __name__ == "__main__":
                 transforms.Normalize((0.1307,), (0.3081,))
             ])
             test_dataset = datasets.MNIST(root='./data', train=False, download=True, transform=transform)
-            test_loader = DataLoader(test_dataset, batch_size=64, shuffle=False, pin_memory=True, num_workers=4)
+            test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE//16, shuffle=False, pin_memory=True, num_workers=4)
             
             # 加载训练好的模型
-            model = SNNModel(28*28, 512, 10).to(device)
+            model = SNNModel(28*28, MODEL_HIDDEN_SIZE, 10).to(device)
             model.load_state_dict(torch.load('snn_model.pth'))
             
             # 测试模型

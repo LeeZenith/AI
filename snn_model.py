@@ -11,7 +11,7 @@ from spikingjelly.activation_based import neuron, layer, functional
 # 全局模型参数
 MODEL_HIDDEN_SIZE = 2048
 TIME_STEPS = 20
-BATCH_SIZE = 1024
+BATCH_SIZE = 2048  # 增加batch_size以充分利用GPU内存
 LEARNING_RATE = 0.001
 EPOCHS = 10
 INPUT_SIZE = 28*28  # MNIST图像大小
@@ -91,6 +91,11 @@ def train_model(model, train_loader, criterion, optimizer, device, epochs=10):
         # 预热GPU
         torch.cuda.empty_cache()
         torch.cuda.synchronize()
+        
+        # 打印GPU信息
+        print(f"CUDA memory allocated: {torch.cuda.memory_allocated(0)/1024**2:.2f} MB")
+        print(f"CUDA memory cached: {torch.cuda.memory_reserved(0)/1024**2:.2f} MB")
+        print(f"CUDA utilization: {torch.cuda.utilization(0)}%")
     else:
         # CPU计时使用time模块
         import time
@@ -170,7 +175,7 @@ def main():
     
     # 加载MNIST数据集
     train_dataset = datasets.MNIST(root='./data', train=True, download=True, transform=transform)
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, pin_memory=True, num_workers=4)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, pin_memory=True, num_workers=8, persistent_workers=True)
     
     # 初始化模型
     model = SNNModel(input_size, hidden_size, output_size).to(device)
